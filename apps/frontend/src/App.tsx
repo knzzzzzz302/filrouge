@@ -163,6 +163,28 @@ function HubPage() {
       source: string;
     }>
   >([]);
+  const [marketImages, setMarketImages] = useState<
+    Array<{ id: string; title: string; imageUrl: string; author: string; license: string; source: string }>
+  >([]);
+  const [estimateForm, setEstimateForm] = useState({
+    city: 'Montpellier',
+    postalCode: '34000',
+    areaM2: 72,
+    rooms: 3,
+    propertyType: 'APARTMENT',
+    condition: 'GOOD',
+    energyClass: 'C',
+    distanceToCenterKm: 4,
+  });
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState('');
+  const [estimateResult, setEstimateResult] = useState<{
+    estimatedValue: number;
+    lowRange: number;
+    highRange: number;
+    confidenceScore: number;
+    suggestions: string[];
+  } | null>(null);
   const token = localStorage.getItem('yplaza_token');
   if (!token) {
     return <Navigate to="/connexion" replace />;
@@ -205,6 +227,14 @@ function HubPage() {
             { id: 2, reference: 'LYO-013', city: 'Lyon', price: 310000, area_m2: 62, status: 'UNDER_OFFER' },
             { id: 3, reference: 'MAR-004', city: 'Marseille', price: 420000, area_m2: 95, status: 'SOLD' },
             { id: 4, reference: 'MTP-021', city: 'Montpellier', price: 295000, area_m2: 68, status: 'AVAILABLE' },
+            { id: 5, reference: 'PAR-101', city: 'Paris', price: 689000, area_m2: 54, status: 'UNDER_OFFER' },
+            { id: 6, reference: 'NAN-020', city: 'Nantes', price: 298000, area_m2: 70, status: 'AVAILABLE' },
+            { id: 7, reference: 'TLS-033', city: 'Toulouse', price: 332000, area_m2: 76, status: 'AVAILABLE' },
+            { id: 8, reference: 'NIC-014', city: 'Nice', price: 515000, area_m2: 66, status: 'UNDER_OFFER' },
+            { id: 9, reference: 'BDX-019', city: 'Bordeaux', price: 389000, area_m2: 82, status: 'AVAILABLE' },
+            { id: 10, reference: 'LIL-011', city: 'Lille', price: 271000, area_m2: 64, status: 'SOLD' },
+            { id: 11, reference: 'REN-026', city: 'Rennes', price: 318000, area_m2: 73, status: 'AVAILABLE' },
+            { id: 12, reference: 'STR-017', city: 'Strasbourg', price: 342000, area_m2: 71, status: 'UNDER_OFFER' },
           ]);
         }
       } finally {
@@ -256,12 +286,78 @@ function HubPage() {
     };
   }, [query]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadIRLImages() {
+      if (query.trim().length < 2) {
+        setMarketImages([]);
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/market/images?q=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error();
+        const payload = (await res.json()) as Array<{
+          id: string;
+          title: string;
+          imageUrl: string;
+          author: string;
+          license: string;
+          source: string;
+        }>;
+        if (!cancelled) setMarketImages(payload);
+      } catch {
+        if (!cancelled) setMarketImages([]);
+      }
+    }
+    const timer = setTimeout(loadIRLImages, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
   const filteredProperties = useMemo(() => {
     return properties.filter((item) => {
       const blob = `${item.reference} ${item.city} ${item.status}`.toLowerCase();
       return blob.includes(query.toLowerCase());
     });
   }, [properties, query]);
+
+  async function onEstimateSubmit(event: FormEvent) {
+    event.preventDefault();
+    setEstimateLoading(true);
+    setEstimateError('');
+    try {
+      const res = await fetch(`${API}/market/estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          city: estimateForm.city,
+          postalCode: estimateForm.postalCode,
+          areaM2: Number(estimateForm.areaM2),
+          rooms: Number(estimateForm.rooms),
+          propertyType: estimateForm.propertyType,
+          condition: estimateForm.condition,
+          energyClass: estimateForm.energyClass,
+          distanceToCenterKm: Number(estimateForm.distanceToCenterKm),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const payload = (await res.json()) as {
+        estimatedValue: number;
+        lowRange: number;
+        highRange: number;
+        confidenceScore: number;
+        suggestions: string[];
+      };
+      setEstimateResult(payload);
+    } catch {
+      setEstimateError('Estimation indisponible pour le moment.');
+      setEstimateResult(null);
+    } finally {
+      setEstimateLoading(false);
+    }
+  }
 
   return (
     <main className="page">
@@ -343,6 +439,104 @@ function HubPage() {
             <p className="muted">Aucun resultat IRL pour cette recherche.</p>
           ) : null}
         </div>
+
+        <h3 className="sectionTitle">Photos reelles (licences ouvertes)</h3>
+        <div className="imageGrid">
+          {marketImages.map((img) => (
+            <article className="imageCard" key={img.id}>
+              <img src={img.imageUrl} alt={img.title} loading="lazy" />
+              <div className="imageMeta">
+                <p className="listingRef">{img.title}</p>
+                <p className="muted">
+                  {img.source} - {img.license}
+                </p>
+              </div>
+            </article>
+          ))}
+          {query.trim().length >= 2 && !marketImages.length ? (
+            <p className="muted">Aucune photo disponible pour cette recherche.</p>
+          ) : null}
+        </div>
+
+        <h3 className="sectionTitle">Estimer mon bien (assistant IA)</h3>
+        <form className="estimateForm" onSubmit={onEstimateSubmit}>
+          <input
+            placeholder="Ville"
+            value={estimateForm.city}
+            onChange={(e) => setEstimateForm({ ...estimateForm, city: e.target.value })}
+          />
+          <input
+            placeholder="Code postal"
+            value={estimateForm.postalCode}
+            onChange={(e) => setEstimateForm({ ...estimateForm, postalCode: e.target.value })}
+          />
+          <input
+            type="number"
+            placeholder="Surface m2"
+            value={estimateForm.areaM2}
+            onChange={(e) => setEstimateForm({ ...estimateForm, areaM2: Number(e.target.value) })}
+          />
+          <input
+            type="number"
+            placeholder="Pieces"
+            value={estimateForm.rooms}
+            onChange={(e) => setEstimateForm({ ...estimateForm, rooms: Number(e.target.value) })}
+          />
+          <select
+            value={estimateForm.propertyType}
+            onChange={(e) => setEstimateForm({ ...estimateForm, propertyType: e.target.value })}
+          >
+            <option value="APARTMENT">Appartement</option>
+            <option value="HOUSE">Maison</option>
+            <option value="PRO">Local pro</option>
+          </select>
+          <select
+            value={estimateForm.condition}
+            onChange={(e) => setEstimateForm({ ...estimateForm, condition: e.target.value })}
+          >
+            <option value="TO_RENOVATE">A renover</option>
+            <option value="GOOD">Bon etat</option>
+            <option value="EXCELLENT">Excellent etat</option>
+          </select>
+          <select
+            value={estimateForm.energyClass}
+            onChange={(e) => setEstimateForm({ ...estimateForm, energyClass: e.target.value })}
+          >
+            <option value="A">DPE A</option>
+            <option value="B">DPE B</option>
+            <option value="C">DPE C</option>
+            <option value="D">DPE D</option>
+            <option value="E">DPE E</option>
+            <option value="F">DPE F</option>
+            <option value="G">DPE G</option>
+          </select>
+          <input
+            type="number"
+            step="0.5"
+            placeholder="Distance centre (km)"
+            value={estimateForm.distanceToCenterKm}
+            onChange={(e) => setEstimateForm({ ...estimateForm, distanceToCenterKm: Number(e.target.value) })}
+          />
+          <button className="btn primary" type="submit">
+            {estimateLoading ? 'Calcul...' : 'Estimer mon bien'}
+          </button>
+        </form>
+        {estimateError ? <p className="error">{estimateError}</p> : null}
+        {estimateResult ? (
+          <div className="estimateCard">
+            <p className="kpiLabel">Valeur estimee</p>
+            <h3>{estimateResult.estimatedValue.toLocaleString()} EUR</h3>
+            <p className="muted">
+              Fourchette: {estimateResult.lowRange.toLocaleString()} - {estimateResult.highRange.toLocaleString()} EUR
+            </p>
+            <p className="muted">Confiance modele: {estimateResult.confidenceScore}%</p>
+            <ul className="suggestionsList">
+              {estimateResult.suggestions.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
     </main>
   );

@@ -3,12 +3,20 @@ import { z } from 'zod';
 import { pool } from '../../db/pool.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 const router = Router();
-let fallbackNextId = 5;
+let fallbackNextId = 13;
 const fallbackProperties = [
     { id: 1, reference: 'AIX-001', city: 'Aix-en-Provence', price: 350000, area_m2: 78, status: 'AVAILABLE' },
     { id: 2, reference: 'LYO-013', city: 'Lyon', price: 310000, area_m2: 62, status: 'UNDER_OFFER' },
     { id: 3, reference: 'MAR-004', city: 'Marseille', price: 420000, area_m2: 95, status: 'SOLD' },
     { id: 4, reference: 'MTP-021', city: 'Montpellier', price: 295000, area_m2: 68, status: 'AVAILABLE' },
+    { id: 5, reference: 'PAR-101', city: 'Paris', price: 689000, area_m2: 54, status: 'UNDER_OFFER' },
+    { id: 6, reference: 'NAN-020', city: 'Nantes', price: 298000, area_m2: 70, status: 'AVAILABLE' },
+    { id: 7, reference: 'TLS-033', city: 'Toulouse', price: 332000, area_m2: 76, status: 'AVAILABLE' },
+    { id: 8, reference: 'NIC-014', city: 'Nice', price: 515000, area_m2: 66, status: 'UNDER_OFFER' },
+    { id: 9, reference: 'BDX-019', city: 'Bordeaux', price: 389000, area_m2: 82, status: 'AVAILABLE' },
+    { id: 10, reference: 'LIL-011', city: 'Lille', price: 271000, area_m2: 64, status: 'SOLD' },
+    { id: 11, reference: 'REN-026', city: 'Rennes', price: 318000, area_m2: 73, status: 'AVAILABLE' },
+    { id: 12, reference: 'STR-017', city: 'Strasbourg', price: 342000, area_m2: 71, status: 'UNDER_OFFER' },
 ];
 const propertySchema = z.object({
     reference: z.string().min(3),

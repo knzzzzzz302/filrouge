@@ -192,6 +192,55 @@ a {
   border: 1px solid #e2e8f0;
   padding: 0.9rem;
 }
+.imageGrid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.imageCard {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.imageCard img {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  display: block;
+}
+.imageMeta {
+  padding: 0.6rem 0.75rem;
+}
+.estimateForm {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.estimateForm input,
+.estimateForm select {
+  border: 1px solid #d9e2ef;
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.66rem 0.75rem;
+}
+.estimateCard {
+  margin-top: 0.75rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 0.9rem;
+  background: #ffffffbd;
+}
+.estimateCard h3 {
+  margin: 0.15rem 0 0.35rem;
+}
+.suggestionsList {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+  color: #334155;
+}
 .listingRef {
   margin: 0;
   color: #475569;
@@ -279,6 +328,12 @@ a {
     grid-template-columns: 1fr;
   }
   .listingGrid {
+    grid-template-columns: 1fr;
+  }
+  .imageGrid {
+    grid-template-columns: 1fr;
+  }
+  .estimateForm {
     grid-template-columns: 1fr;
   }
   .hubSearch {
