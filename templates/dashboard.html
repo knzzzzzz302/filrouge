@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Analyse du marché — Y-Plaza{% endblock %}
+
+{% block styles %}
+.dash{padding:clamp(3rem,6vw,5rem) 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2rem;margin:2.4rem 0 3rem}
+.kpi{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.5rem 1.6rem;
+}
+.kpi .n{font-family:'Cormorant Garamond',serif;font-size:2.1rem;font-weight:600;line-height:1.1}
+.kpi .l{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);margin-top:.4rem}
+.charts{display:grid;grid-template-columns:1.4fr 1fr;gap:1.8rem}
+@media (max-width:900px){.charts{grid-template-columns:1fr}}
+.chart-card{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.8rem;box-shadow:var(--shadow);
+}
+.chart-card h3{
+  font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;margin-bottom:1.2rem;
+}
+.city-table{width:100%;border-collapse:collapse;margin-top:2.6rem;background:var(--white);
+  border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.city-table th,.city-table td{padding:.9rem 1.2rem;text-align:left;font-size:.9rem}
+.city-table th{
+  background:var(--ink);color:var(--white);font-weight:500;
+  font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+}
+.city-table tr:not(:last-child) td{border-bottom:1px solid var(--line)}
+.city-table td:not(:first-child),.city-table th:not(:first-child){text-align:right}
+{% endblock %}
+
+{% block content %}
+<main class="dash">
+  <div class="wrap">
+    <p class="eyebrow reveal">Traitement & analyse de données</p>
+    <h1 class="display reveal d1" style="font-size:clamp(2.2rem,5vw,3.4rem)">Le marché en un regard</h1>
+
+    <!-- Indicateurs calculés en SQL côté serveur -->
+    <div class="kpis reveal d2">
+      <div class="kpi"><div class="n">{{ stats.total }}</div><div class="l">Biens suivis</div></div>
+      <div class="kpi"><div class="n">{{ "{:,.0f}".format(stats.prix_moyen).replace(",", " ") }} €</div><div class="l">Prix moyen</div></div>
+      <div class="kpi"><div class="n">{{ "%.0f"|format(stats.prix_m2) }} €/m²</div><div class="l">Prix moyen au m²</div></div>
+      <div class="kpi"><div class="n">{{ "{:,.0f}".format(stats.prix_max).replace(",", " ") }} €</div><div class="l">Bien le plus cher</div></div>
+    </div>
+
+    <div class="charts reveal d3">
+      <div class="chart-card">
+        <h3>Prix moyen au m² par ville</h3>
+        <canvas id="chartVilles" height="240"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Répartition par type de bien</h3>
+        <canvas id="chartTypes" height="240"></canvas>
+      </div>
+    </div>
+
+    <table class="city-table reveal d4">
+      <thead>
+        <tr><th>Ville</th><th>Biens</th><th>Prix moyen</th><th>Prix / m²</th></tr>
+      </thead>
+      <tbody>
+        {% for v in par_ville %}
+        <tr>
+          <td>{{ v.ville }}</td>
+          <td>{{ v.nb }}</td>
+          <td>{{ "{:,.0f}".format(v.prix_moyen).replace(",", " ") }} €</td>
+          <td>{{ "%.0f"|format(v.prix_m2) }} €/m²</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// Les données sont injectées par Jinja depuis les requêtes SQL du backend
+const villes   = {{ par_ville | map(attribute='ville')    | list | tojson }};
+const prixM2   = {{ par_ville | map(attribute='prix_m2')  | list | tojson }};
+const types    = {{ par_type  | map(attribute='type')     | list | tojson }};
+const nbTypes  = {{ par_type  | map(attribute='nb')       | list | tojson }};
+
+const ink = '#171c26', brass = '#a8834f', line = '#ddd6c8';
+Chart.defaults.font.family = 'Outfit';
+Chart.defaults.color = '#4a5162';
+
+new Chart(document.getElementById('chartVilles'), {
+  type: 'bar',
+  data: {
+    labels: villes,
+    datasets: [{ data: prixM2, backgroundColor: brass, borderRadius: 6, maxBarThickness: 34 }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { grid: { color: line }, ticks: { callback: v => v + ' €' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+new Chart(document.getElementById('chartTypes'), {
+  type: 'doughnut',
+  data: {
+    labels: types,
+    datasets: [{ data: nbTypes,
+      backgroundColor: [ink, brass, '#3e5c50', '#a3672c'],
+      borderColor: '#fffdf9', borderWidth: 3 }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
+});
+</script>
+{% endblock %}

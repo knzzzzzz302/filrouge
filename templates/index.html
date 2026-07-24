@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block styles %}
+/* ---------- Hero ---------- */
+.hero{
+  position:relative;overflow:hidden;
+  padding:clamp(4rem,9vw,7.5rem) 0 clamp(3rem,6vw,5rem);
+  background:
+    radial-gradient(1200px 500px at 85% -10%,rgba(168,131,79,.14),transparent 60%),
+    radial-gradient(900px 420px at -10% 110%,rgba(62,92,80,.10),transparent 55%),
+    var(--paper);
+}
+.hero h1{
+  font-size:clamp(2.6rem,6.4vw,4.6rem);max-width:15ch;
+}
+.hero h1 em{font-style:italic;color:var(--brass)}
+.hero p.lede{
+  margin-top:1.3rem;max-width:52ch;font-size:1.05rem;color:var(--ink-soft);
+}
+.hero-stats{
+  display:flex;gap:clamp(1.4rem,4vw,3.5rem);margin-top:2.8rem;flex-wrap:wrap;
+}
+.hstat .n{
+  font-family:'Cormorant Garamond',serif;font-size:clamp(1.9rem,3.4vw,2.7rem);
+  font-weight:600;line-height:1;
+}
+.hstat .l{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin-top:.4rem}
+
+/* ---------- Barre de recherche ---------- */
+.searchbar{
+  margin-top:3rem;background:var(--white);border:1px solid var(--line);
+  border-radius:18px;box-shadow:var(--shadow);
+  padding:1rem;display:grid;gap:.8rem;
+  grid-template-columns:1.6fr 1fr 1fr 1fr auto;align-items:end;
+}
+.searchbar .field input,.searchbar .field select{padding:.7rem .9rem}
+@media (max-width:960px){.searchbar{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.searchbar{grid-template-columns:1fr}}
+
+/* ---------- Résultats ---------- */
+.results-info{font-size:.9rem;color:var(--ink-soft)}
+.empty{
+  text-align:center;padding:5rem 1rem;border:1px dashed var(--line);border-radius:var(--radius);
+}
+.empty h3{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:600;margin-bottom:.6rem}
+{% endblock %}
+
+{% block content %}
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow reveal">Groupe immobilier — Aix-en-Provence & 12 agences</p>
+    <h1 class="display reveal d1">L'immobilier de <em>caractère</em>, du Luberon au littoral.</h1>
+    <p class="lede reveal d2">Y-Plaza réunit l'achat et la vente de biens résidentiels et professionnels
+    sur une plateforme unique, au service des clients comme de nos agences.</p>
+
+    <div class="hero-stats reveal d3">
+      <div class="hstat"><div class="n">{{ stats.total }}</div><div class="l">Biens au catalogue</div></div>
+      <div class="hstat"><div class="n">{{ stats.en_vente }}</div><div class="l">Disponibles</div></div>
+      <div class="hstat"><div class="n">{{ "%.0f"|format(stats.prix_moyen/1000) }} k€</div><div class="l">Prix moyen</div></div>
+      <div class="hstat"><div class="n">{{ "%.0f"|format(stats.prix_m2) }} €</div><div class="l">Prix moyen / m²</div></div>
+    </div>
+
+    <!-- Recherche & filtres : envoyés en GET vers la même page -->
+    <form class="searchbar reveal d4" method="GET" action="{{ url_for('biens') }}">
+      <div class="field">
+        <label>Recherche</label>
+        <input type="text" name="q" placeholder="Bastide, vue mer, Luberon…" value="{{ q }}">
+      </div>
+      <div class="field">
+        <label>Ville</label>
+        <select name="ville">
+          <option value="">Toutes</option>
+          {% for v in villes %}
+          <option value="{{ v }}" {% if v == ville %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <select name="type">
+          <option value="">Tous</option>
+          {% for t in ["Appartement","Maison","Local commercial","Terrain"] %}
+          <option value="{{ t }}" {% if t == type_bien %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Budget max</label>
+        <select name="prix_max">
+          <option value="">Sans limite</option>
+          {% for p in [300000, 500000, 800000, 1200000, 2000000] %}
+          <option value="{{ p }}" {% if prix_max == p|string %}selected{% endif %}>{{ "{:,.0f}".format(p).replace(",", " ") }} €</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-brass" type="submit">Rechercher</button>
+    </form>
+  </div>
+</header>
+
+<main class="section" id="biens">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Catalogue</p>
+        <h2 class="display">Nos biens</h2>
+      </div>
+      <p class="results-info">{{ biens|length }} bien{{ "s" if biens|length > 1 }} affiché{{ "s" if biens|length > 1 }}</p>
+    </div>
+
+    {% if biens|length == 0 %}
+    <div class="empty">
+      <h3>Aucun bien ne correspond</h3>
+      <p>Élargissez vos critères ou <a href="{{ url_for('biens') }}">réinitialisez la recherche</a>.</p>
+    </div>
+    {% endif %}
+
+    <div class="grid">
+      {% for bien in biens %}
+      <article class="card" style="animation-delay:{{ loop.index0 % 6 * 0.07 }}s">
+        <div class="card-visual">
+          {% if bien.image_url %}<img src="{{ bien.image_url }}" alt="{{ bien.titre }}" loading="lazy">{% endif %}
+          <span class="monogram">{{ bien.ville[:2]|upper }}</span>
+          {% if bien.statut == 'A vendre' %}<span class="badge vente">À vendre</span>
+          {% elif bien.statut == 'En négociation' %}<span class="badge nego">En négociation</span>
+          {% else %}<span class="badge vendu">Vendu</span>{% endif %}
+          {% if user %}
+          <form method="POST" action="{{ url_for('toggle_favori', bien_id=bien.id) }}">
+            <button class="fav-btn {{ 'on' if bien.id in favs }}"
+                    title="{{ 'Retirer des favoris' if bien.id in favs else 'Ajouter aux favoris' }}">
+              {{ '♥' if bien.id in favs else '♡' }}</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <span class="card-city">{{ bien.ville }}</span>
+          <h3 class="card-title"><a href="{{ url_for('detail', bien_id=bien.id) }}">{{ bien.titre }}</a></h3>
+          <div class="card-specs">
+            <span>{{ bien.type }}</span>
+            <span>{{ "%.0f"|format(bien.surface) }} m²</span>
+            {% if bien.pieces > 0 %}<span>{{ bien.pieces }} pièce{{ "s" if bien.pieces > 1 }}</span>{% endif %}
+          </div>
+          <div class="card-price">
+            <span class="price">{{ "{:,.0f}".format(bien.prix).replace(",", " ") }} €
+              <small>{{ "%.0f"|format(bien.prix / bien.surface) }} €/m²</small></span>
+            {% if user and user.role == 'agent' %}
+            <div class="card-actions">
+              <a class="icon-btn" href="{{ url_for('modifier', bien_id=bien.id) }}" title="Modifier">✎</a>
+              <form method="POST" action="{{ url_for('supprimer', bien_id=bien.id) }}"
+                    onsubmit="return confirm('Supprimer « {{ bien.titre }} » ?');">
+                <button class="icon-btn danger" title="Supprimer">✕</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</main>
+{% endblock %}

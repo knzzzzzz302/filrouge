@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Connexion — Y-Plaza{% endblock %}
+
+{% block content %}
+<main class="auth-wrap reveal">
+  <div class="auth-card">
+    <p class="eyebrow">Espace personnel</p>
+    <h1 class="display">Connexion</h1>
+    <form method="POST">
+      <div class="fields">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" required placeholder="vous@exemple.fr" autofocus>
+        </div>
+        <div class="field">
+          <label>Mot de passe</label>
+          <input type="password" name="password" required placeholder="••••••••">
+        </div>
+        <button class="btn btn-brass" type="submit">Se connecter</button>
+      </div>
+    </form>
+    <p class="auth-foot">
+      Pas encore de compte ? <a href="{{ url_for('register') }}">Créer un compte</a><br>
+      <small style="color:var(--grey)">Démo agent : agent@yplaza.fr / Demo2026!</small>
+    </p>
+  </div>
+</main>
+{% endblock %}

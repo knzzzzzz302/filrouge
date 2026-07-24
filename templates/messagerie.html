@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Messagerie — Y-Plaza{% endblock %}
+
+{% block styles %}
+.msg-wrap{max-width:860px;margin:0 auto;padding:clamp(3rem,6vw,5rem) 1.2rem}
+.msg-list{display:flex;flex-direction:column;gap:1rem;margin-top:2.2rem}
+.msg{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.4rem 1.6rem;animation:rise .6s var(--ease) both;
+}
+.msg-head{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.6rem}
+.msg-who{font-weight:500;font-size:.95rem}
+.msg-who small{color:var(--ink-soft);font-weight:300;margin-left:.5rem}
+.msg-date{font-size:.78rem;color:var(--grey)}
+.msg-bien{font-size:.8rem;color:var(--brass);letter-spacing:.06em}
+.msg-bien a{color:var(--brass)}
+.msg-body{margin-top:.6rem;color:var(--ink-soft);line-height:1.7}
+.msg-empty{
+  border:1px dashed var(--line);border-radius:var(--radius);
+  text-align:center;padding:4.5rem 1.5rem;color:var(--ink-soft);margin-top:2.2rem;
+}
+{% endblock %}
+
+{% block content %}
+<main class="msg-wrap">
+  <p class="eyebrow reveal">Espace agents</p>
+  <h1 class="display reveal d1" style="font-size:clamp(2.2rem,5vw,3.2rem)">Messagerie</h1>
+  <p class="reveal d2" style="color:var(--ink-soft);margin-top:.6rem">
+    Les demandes envoyées par les clients depuis les fiches de biens.
+  </p>
+
+  {% if msgs|length == 0 %}
+  <div class="msg-empty reveal">
+    <h3 class="display" style="font-size:1.6rem;color:var(--ink);margin-bottom:.5rem">Aucun message</h3>
+    <p>Les demandes des clients apparaîtront ici.</p>
+  </div>
+  {% endif %}
+
+  <div class="msg-list">
+    {% for m in msgs %}
+    <article class="msg" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+      <div class="msg-head">
+        <span class="msg-who">{{ m.expediteur }}<small>{{ m.email }}</small></span>
+        <span class="msg-date">{{ m.date_envoi }}</span>
+      </div>
+      <div class="msg-bien">À propos de : <a href="{{ url_for('detail', bien_id=m.bid) }}">{{ m.bien_titre }}</a></div>
+      <p class="msg-body">{{ m.contenu }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</main>
+{% endblock %}

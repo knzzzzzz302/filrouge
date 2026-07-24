@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Mes favoris — Y-Plaza{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <p class="eyebrow">Espace personnel</p>
+        <h2 class="display">Mes favoris</h2>
+      </div>
+      <p style="font-size:.9rem;color:var(--ink-soft)">{{ biens|length }} bien{{ "s" if biens|length > 1 }} sauvegardé{{ "s" if biens|length > 1 }}</p>
+    </div>
+
+    {% if biens|length == 0 %}
+    <div style="text-align:center;padding:5rem 1rem;border:1px dashed var(--line);border-radius:var(--radius)">
+      <h3 class="display" style="font-size:1.8rem;margin-bottom:.6rem">Aucun favori pour l'instant</h3>
+      <p style="color:var(--ink-soft)">Cliquez sur le cœur d'un bien pour le retrouver ici.</p>
+      <a class="btn btn-brass" style="margin-top:1.4rem" href="{{ url_for('biens') }}">Parcourir les biens</a>
+    </div>
+    {% endif %}
+
+    <div class="grid">
+      {% for bien in biens %}
+      <article class="card" style="animation-delay:{{ loop.index0 % 6 * 0.07 }}s">
+        <div class="card-visual">
+          {% if bien.image_url %}<img src="{{ bien.image_url }}" alt="{{ bien.titre }}" loading="lazy">{% endif %}
+          <span class="monogram">{{ bien.ville[:2]|upper }}</span>
+          {% if bien.statut == 'A vendre' %}<span class="badge vente">À vendre</span>
+          {% elif bien.statut == 'En négociation' %}<span class="badge nego">En négociation</span>
+          {% else %}<span class="badge vendu">Vendu</span>{% endif %}
+          <form method="POST" action="{{ url_for('toggle_favori', bien_id=bien.id) }}">
+            <button class="fav-btn on" title="Retirer des favoris">♥</button>
+          </form>
+        </div>
+        <div class="card-body">
+          <span class="card-city">{{ bien.ville }}</span>
+          <h3 class="card-title"><a href="{{ url_for('detail', bien_id=bien.id) }}">{{ bien.titre }}</a></h3>
+          <div class="card-specs">
+            <span>{{ bien.type }}</span>
+            <span>{{ "%.0f"|format(bien.surface) }} m²</span>
+            {% if bien.pieces > 0 %}<span>{{ bien.pieces }} pièce{{ "s" if bien.pieces > 1 }}</span>{% endif %}
+          </div>
+          <div class="card-price">
+            <span class="price">{{ "{:,.0f}".format(bien.prix).replace(",", " ") }} €</span>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</main>
+{% endblock %}

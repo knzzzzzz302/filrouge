@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Y-Plaza — Groupe immobilier, Aix-en-Provence & 12 agences{% endblock %}
+
+{% block styles %}
+/* ---------- Hero landing ---------- */
+.lhero{
+  position:relative;min-height:88vh;display:flex;align-items:flex-end;
+  color:var(--white);overflow:hidden;
+}
+.lhero::before{
+  content:"";position:absolute;inset:0;
+  background:url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=75') center/cover;
+  transform:scale(1.04);
+}
+.lhero::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(23,28,38,.25) 0%,rgba(23,28,38,.78) 100%);
+}
+.lhero .wrap{position:relative;z-index:2;padding-bottom:clamp(3rem,7vw,5.5rem);width:100%}
+.lhero .eyebrow{color:var(--brass-soft)}
+.lhero h1{font-size:clamp(2.8rem,7vw,5.2rem);max-width:14ch;color:var(--white)}
+.lhero h1 em{font-style:italic;color:var(--brass-soft)}
+.lhero p.lede{margin-top:1.2rem;max-width:50ch;font-size:1.06rem;color:rgba(255,253,249,.85)}
+.lhero-cta{display:flex;gap:.9rem;margin-top:2.2rem;flex-wrap:wrap}
+.lhero .btn-line{border-color:rgba(255,253,249,.7);color:var(--white)}
+.lhero .btn-line:hover{background:var(--white);color:var(--ink)}
+.lhero-stats{
+  display:flex;gap:clamp(1.6rem,5vw,4rem);margin-top:3rem;
+  padding-top:2rem;border-top:1px solid rgba(255,253,249,.25);flex-wrap:wrap;
+}
+.lhero-stats .n{font-family:'Cormorant Garamond',serif;font-size:2.3rem;font-weight:600;line-height:1}
+.lhero-stats .l{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,253,249,.7);margin-top:.35rem}
+
+/* ---------- Services ---------- */
+.services{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.6rem}
+.service{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:2rem;transition:transform .4s var(--ease),box-shadow .4s var(--ease);
+}
+.service:hover{transform:translateY(-6px);box-shadow:var(--shadow)}
+.service .ic{
+  width:3rem;height:3rem;border-radius:12px;display:grid;place-items:center;
+  background:rgba(168,131,79,.12);color:var(--brass);font-size:1.3rem;margin-bottom:1.2rem;
+}
+.service h3{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;margin-bottom:.5rem}
+.service p{font-size:.9rem;color:var(--ink-soft)}
+.service a{color:var(--brass);font-size:.85rem;text-decoration:none;display:inline-block;margin-top:.9rem}
+
+/* ---------- Bandeau estimation ---------- */
+.estim-band{
+  position:relative;border-radius:var(--radius);overflow:hidden;color:var(--white);
+  padding:clamp(2.5rem,6vw,4.5rem);text-align:center;
+}
+.estim-band::before{
+  content:"";position:absolute;inset:0;
+  background:url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=70') center/cover;
+}
+.estim-band::after{content:"";position:absolute;inset:0;background:rgba(23,28,38,.8)}
+.estim-band > *{position:relative;z-index:2}
+.estim-band h2{font-size:clamp(1.9rem,4vw,2.8rem);color:var(--white);max-width:22ch;margin:0 auto}
+.estim-band p{color:rgba(255,253,249,.8);margin:1rem auto 1.8rem;max-width:48ch}
+{% endblock %}
+
+{% block content %}
+<header class="lhero">
+  <div class="wrap">
+    <p class="eyebrow reveal">Groupe immobilier — Siège Aix-en-Provence · 12 agences</p>
+    <h1 class="display reveal d1">Trouver le lieu qui vous <em>ressemble</em>.</h1>
+    <p class="lede reveal d2">Résidentiel et professionnel, du Luberon au littoral :
+    une plateforme unique pour acheter, vendre et estimer, portée par nos agences partout en France.</p>
+    <div class="lhero-cta reveal d3">
+      <a class="btn btn-brass" href="{{ url_for('biens') }}">Découvrir nos biens</a>
+      <a class="btn btn-line" href="{{ url_for('estimation') }}">Estimer un bien</a>
+    </div>
+    <div class="lhero-stats reveal d4">
+      <div><div class="n">{{ stats.total }}</div><div class="l">Biens au catalogue</div></div>
+      <div><div class="n">{{ stats.en_vente }}</div><div class="l">Disponibles</div></div>
+      <div><div class="n">{{ "%.0f"|format(stats.prix_m2) }} €</div><div class="l">Prix moyen / m²</div></div>
+      <div><div class="n">12</div><div class="l">Agences en France</div></div>
+    </div>
+  </div>
+</header>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Nos services</p>
+        <h2 class="display">Un interlocuteur pour chaque projet</h2>
+      </div>
+    </div>
+    <div class="services">
+      <div class="service reveal">
+        <div class="ic">⌂</div>
+        <h3>Acheter</h3>
+        <p>Un catalogue sélectionné de biens résidentiels et professionnels, mis à jour par nos agences.</p>
+        <a href="{{ url_for('biens') }}">Parcourir les biens →</a>
+      </div>
+      <div class="service reveal d1">
+        <div class="ic">◈</div>
+        <h3>Vendre</h3>
+        <p>Nos agents publient, suivent et négocient votre bien depuis la plateforme centralisée.</p>
+        <a href="{{ url_for('register') }}">Contacter une agence →</a>
+      </div>
+      <div class="service reveal d2">
+        <div class="ic">≋</div>
+        <h3>Estimer</h3>
+        <p>Valeur de vente, budget d'achat et loyer estimés à partir des prix du marché français.</p>
+        <a href="{{ url_for('estimation') }}">Lancer une estimation →</a>
+      </div>
+      <div class="service reveal d3">
+        <div class="ic">◔</div>
+        <h3>Analyser</h3>
+        <p>Tendances par ville, prix au m² et répartition du parc : le marché en un regard.</p>
+        <a href="{{ url_for('dashboard') }}">Voir le marché →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Sélection</p>
+        <h2 class="display">Biens d'exception</h2>
+      </div>
+      <a class="btn btn-line" href="{{ url_for('biens') }}">Tout le catalogue</a>
+    </div>
+    <div class="grid">
+      {% for bien in vedettes %}
+      <article class="card" style="animation-delay:{{ loop.index0 * 0.1 }}s">
+        <div class="card-visual">
+          {% if bien.image_url %}<img src="{{ bien.image_url }}" alt="{{ bien.titre }}" loading="lazy">{% endif %}
+          <span class="monogram">{{ bien.ville[:2]|upper }}</span>
+          <span class="badge vente">À vendre</span>
+          {% if user %}
+          <form method="POST" action="{{ url_for('toggle_favori', bien_id=bien.id) }}">
+            <button class="fav-btn {{ 'on' if bien.id in favs }}">{{ '♥' if bien.id in favs else '♡' }}</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <span class="card-city">{{ bien.ville }}</span>
+          <h3 class="card-title"><a href="{{ url_for('detail', bien_id=bien.id) }}">{{ bien.titre }}</a></h3>
+          <div class="card-specs">
+            <span>{{ bien.type }}</span><span>{{ "%.0f"|format(bien.surface) }} m²</span>
+          </div>
+          <div class="card-price">
+            <span class="price">{{ "{:,.0f}".format(bien.prix).replace(",", " ") }} €</span>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="estim-band reveal">
+      <p class="eyebrow" style="color:var(--brass-soft)">Estimation en ligne</p>
+      <h2 class="display">Combien vaut votre bien aujourd'hui ?</h2>
+      <p>Vente, budget d'achat frais inclus, loyer et rendement : une estimation
+      immédiate basée sur les prix du marché français.</p>
+      <a class="btn btn-brass" href="{{ url_for('estimation') }}">Estimer gratuitement</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

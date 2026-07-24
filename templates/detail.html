@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ bien.titre }} — Y-Plaza{% endblock %}
+
+{% block styles %}
+.detail-hero{
+  padding:clamp(3rem,6vw,5rem) 0 0;
+}
+.crumbs{font-size:.8rem;color:var(--ink-soft);margin-bottom:1.6rem}
+.crumbs a{color:var(--ink-soft);text-decoration:none}
+.crumbs a:hover{color:var(--brass)}
+.detail-grid{
+  display:grid;grid-template-columns:1.35fr 1fr;gap:2.6rem;align-items:start;
+}
+@media (max-width:900px){.detail-grid{grid-template-columns:1fr}}
+.detail-visual{
+  position:relative;border-radius:var(--radius);overflow:hidden;aspect-ratio:16/11;
+  background:
+    linear-gradient(150deg,rgba(23,28,38,.04),rgba(23,28,38,.32)),
+    repeating-linear-gradient(45deg,var(--paper-deep) 0 16px,#e6e0d2 16px 32px);
+  display:grid;place-items:center;
+}
+.detail-visual .monogram{
+  font-family:'Cormorant Garamond',serif;font-size:7rem;font-weight:600;
+  color:rgba(23,28,38,.13);
+}
+.panel{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:2rem;box-shadow:var(--shadow);
+}
+.panel .card-city{font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;color:var(--brass);font-weight:500}
+.panel h1{font-size:clamp(1.7rem,3vw,2.3rem);margin:.4rem 0 1rem}
+.panel .price{font-size:2rem}
+.spec-table{width:100%;margin:1.4rem 0;border-collapse:collapse}
+.spec-table td{padding:.65rem 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.spec-table td:first-child{color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;font-size:.74rem;font-weight:500}
+.spec-table td:last-child{text-align:right;font-weight:400}
+.desc{margin-top:1.6rem;color:var(--ink-soft);line-height:1.75}
+.detail-actions{display:flex;gap:.8rem;margin-top:1.8rem;flex-wrap:wrap}
+{% endblock %}
+
+{% block content %}
+<main class="detail-hero">
+  <div class="wrap">
+    <p class="crumbs reveal"><a href="{{ url_for('biens') }}">Nos biens</a> · {{ bien.ville }} · {{ bien.type }}</p>
+
+    <div class="detail-grid">
+      <div class="detail-visual reveal d1">
+        {% if bien.image_url %}<img src="{{ bien.image_url }}" alt="{{ bien.titre }}"
+             style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">{% endif %}
+        <span class="monogram">{{ bien.ville[:2]|upper }}</span>
+        {% if bien.statut == 'A vendre' %}<span class="badge vente">À vendre</span>
+        {% elif bien.statut == 'En négociation' %}<span class="badge nego">En négociation</span>
+        {% else %}<span class="badge vendu">Vendu</span>{% endif %}
+      </div>
+
+      <aside class="panel reveal d2">
+        <span class="card-city">{{ bien.ville }}</span>
+        <h1 class="display">{{ bien.titre }}</h1>
+        <span class="price">{{ "{:,.0f}".format(bien.prix).replace(",", " ") }} €</span>
+
+        <table class="spec-table">
+          <tr><td>Type</td><td>{{ bien.type }}</td></tr>
+          <tr><td>Surface</td><td>{{ "%.0f"|format(bien.surface) }} m²</td></tr>
+          {% if bien.pieces > 0 %}<tr><td>Pièces</td><td>{{ bien.pieces }}</td></tr>{% endif %}
+          <tr><td>Prix au m²</td><td>{{ "%.0f"|format(bien.prix / bien.surface) }} €/m²</td></tr>
+          <tr><td>Statut</td><td>{{ bien.statut }}</td></tr>
+        </table>
+
+        <p class="desc">{{ bien.description }}</p>
+
+        <div class="detail-actions">
+          {% if user %}
+          <form method="POST" action="{{ url_for('toggle_favori', bien_id=bien.id) }}">
+            <button class="btn btn-brass" type="submit">
+              {{ '♥ Retirer des favoris' if bien.id in favs else '♡ Ajouter aux favoris' }}
+            </button>
+          </form>
+          {% endif %}
+          {% if user and user.role == 'agent' %}
+          <a class="btn btn-ink" href="{{ url_for('modifier', bien_id=bien.id) }}">Modifier la fiche</a>
+          <form method="POST" action="{{ url_for('supprimer', bien_id=bien.id) }}"
+                onsubmit="return confirm('Supprimer « {{ bien.titre }} » ?');">
+            <button class="btn btn-line" type="submit">Supprimer</button>
+          </form>
+          {% endif %}
+          {% if not user %}
+          <a class="btn btn-line" href="{{ url_for('login') }}">Se connecter pour sauvegarder</a>
+          {% endif %}
+        </div>
+
+        {% if user %}
+        <form method="POST" action="{{ url_for('envoyer_message', bien_id=bien.id) }}"
+              style="margin-top:1.8rem;display:flex;flex-direction:column;gap:.7rem">
+          <div class="field">
+            <label>Contacter l'agence à propos de ce bien</label>
+            <textarea name="contenu" rows="3" required
+              placeholder="Bonjour, je souhaite organiser une visite…"></textarea>
+          </div>
+          <button class="btn btn-ink" type="submit" style="align-self:flex-start">Envoyer le message</button>
+        </form>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+</main>
+
+{% if similaires %}
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">À découvrir aussi</p>
+        <h2 class="display">Biens similaires</h2>
+      </div>
+    </div>
+    <div class="grid">
+      {% for bien in similaires %}
+      <article class="card" style="animation-delay:{{ loop.index0 * 0.1 }}s">
+        <div class="card-visual">
+          {% if bien.image_url %}<img src="{{ bien.image_url }}" alt="{{ bien.titre }}" loading="lazy">{% endif %}
+          <span class="monogram">{{ bien.ville[:2]|upper }}</span>
+          {% if bien.statut == 'A vendre' %}<span class="badge vente">À vendre</span>
+          {% elif bien.statut == 'En négociation' %}<span class="badge nego">En négociation</span>
+          {% else %}<span class="badge vendu">Vendu</span>{% endif %}
+        </div>
+        <div class="card-body">
+          <span class="card-city">{{ bien.ville }}</span>
+          <h3 class="card-title"><a href="{{ url_for('detail', bien_id=bien.id) }}">{{ bien.titre }}</a></h3>
+          <div class="card-specs">
+            <span>{{ bien.type }}</span><span>{{ "%.0f"|format(bien.surface) }} m²</span>
+          </div>
+          <div class="card-price">
+            <span class="price">{{ "{:,.0f}".format(bien.prix).replace(",", " ") }} €</span>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

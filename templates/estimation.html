@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Estimer un bien — Y-Plaza{% endblock %}
+
+{% block styles %}
+.est-wrap{max-width:1080px;margin:0 auto;padding:clamp(3rem,6vw,5rem) 1.2rem}
+.est-grid{display:grid;grid-template-columns:1fr 1.25fr;gap:2.2rem;align-items:start;margin-top:2.4rem}
+@media (max-width:900px){.est-grid{grid-template-columns:1fr}}
+.est-form{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:2rem;display:flex;flex-direction:column;gap:1.2rem;
+}
+.est-note{font-size:.78rem;color:var(--grey);margin-top:.4rem}
+.res{
+  display:flex;flex-direction:column;gap:1.2rem;
+}
+.res-main{
+  background:var(--ink);color:var(--white);border-radius:var(--radius);
+  padding:2.2rem;text-align:center;
+}
+.res-main .l{font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--brass-soft)}
+.res-main .v{font-family:'Cormorant Garamond',serif;font-size:clamp(2.4rem,5vw,3.4rem);font-weight:600;margin:.4rem 0}
+.res-main .range{font-size:.9rem;color:rgba(255,253,249,.7)}
+.res-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem}
+.res-card{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.4rem;text-align:center;
+}
+.res-card .v{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600}
+.res-card .l{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-top:.3rem}
+.res-empty{
+  border:1px dashed var(--line);border-radius:var(--radius);
+  display:grid;place-items:center;min-height:320px;text-align:center;padding:2rem;color:var(--ink-soft);
+}
+.res-empty .big{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--ink);margin-bottom:.5rem}
+{% endblock %}
+
+{% block content %}
+<main class="est-wrap">
+  <p class="eyebrow reveal">Estimation en ligne</p>
+  <h1 class="display reveal d1" style="font-size:clamp(2.2rem,5vw,3.4rem)">Estimez la valeur d'un bien</h1>
+  <p class="reveal d2" style="color:var(--ink-soft);max-width:60ch;margin-top:.8rem">
+    L'estimation s'appuie sur un barème interne des prix médians au m² du marché français,
+    ajusté selon le type de bien et son état.
+  </p>
+
+  <div class="est-grid">
+    <!-- Formulaire -->
+    <form class="est-form reveal d2" method="POST">
+      <div class="field">
+        <label>Ville</label>
+        <select name="ville" required>
+          {% for v in villes %}
+          <option value="{{ v }}" {% if resultat and resultat.ville == v %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Type de bien</label>
+        <select name="type" required>
+          {% for t in ["Appartement","Maison","Local commercial","Terrain"] %}
+          <option value="{{ t }}" {% if resultat and resultat.type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Surface (m²)</label>
+        <input type="number" name="surface" min="8" step="1" required
+               value="{{ '%.0f'|format(resultat.surface) if resultat else '' }}" placeholder="85">
+      </div>
+      <div class="field">
+        <label>État du bien</label>
+        <select name="etat" required>
+          {% for e in ["Neuf ou refait","Bon état","Travaux à prévoir"] %}
+          <option value="{{ e }}" {% if resultat and resultat.etat == e %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-brass" type="submit">Calculer l'estimation</button>
+      <p class="est-note">Estimation indicative, ne remplace pas l'avis d'un agent sur place.</p>
+    </form>
+
+    <!-- Résultats -->
+    {% if resultat %}
+    <div class="res reveal">
+      <div class="res-main">
+        <div class="l">Valeur de vente estimée</div>
+        <div class="v">{{ "{:,.0f}".format(resultat.vente).replace(",", " ") }} €</div>
+        <div class="range">
+          Fourchette : {{ "{:,.0f}".format(resultat.vente_basse).replace(",", " ") }} € —
+          {{ "{:,.0f}".format(resultat.vente_haute).replace(",", " ") }} €
+          · Réf. {{ resultat.prix_m2_ref }} €/m² à {{ resultat.ville }}
+        </div>
+      </div>
+      <div class="res-cards">
+        <div class="res-card">
+          <div class="v">{{ "{:,.0f}".format(resultat.budget_achat).replace(",", " ") }} €</div>
+          <div class="l">Budget achat<br>frais de notaire inclus</div>
+        </div>
+        <div class="res-card">
+          <div class="v">{{ "{:,.0f}".format(resultat.notaire).replace(",", " ") }} €</div>
+          <div class="l">Frais de notaire<br>(~7,5 % ancien)</div>
+        </div>
+        {% if resultat.loyer > 0 %}
+        <div class="res-card">
+          <div class="v">{{ "{:,.0f}".format(resultat.loyer).replace(",", " ") }} €</div>
+          <div class="l">Loyer mensuel<br>estimé</div>
+        </div>
+        <div class="res-card">
+          <div class="v">{{ "%.1f"|format(resultat.rendement) }} %</div>
+          <div class="l">Rendement<br>locatif brut</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="res-empty reveal">
+      <div>
+        <div class="big">Votre estimation apparaîtra ici</div>
+        <p>Renseignez la ville, le type, la surface et l'état du bien.</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

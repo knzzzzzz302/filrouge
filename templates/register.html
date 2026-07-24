@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Créer un compte — Y-Plaza<script>
+// Affiche le champ code uniquement si "Agent" est sélectionné
+const codeField = document.getElementById('code-field');
+document.querySelectorAll('input[name="role"]').forEach(r => {
+  r.addEventListener('change', () => {
+    codeField.style.display = (document.getElementById('r-agent').checked) ? 'flex' : 'none';
+  });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<main class="auth-wrap reveal">
+  <div class="auth-card">
+    <p class="eyebrow">Rejoindre Y-Plaza</p>
+    <h1 class="display">Créer un compte</h1>
+    <form method="POST">
+      <div class="fields">
+        <div class="field">
+          <label>Nom complet</label>
+          <input type="text" name="nom" required placeholder="Camille Roux" autofocus>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" required placeholder="vous@exemple.fr">
+        </div>
+        <div class="field">
+          <label>Mot de passe <small style="text-transform:none;letter-spacing:0">(8 caractères min.)</small></label>
+          <input type="password" name="password" required minlength="8" placeholder="••••••••">
+        </div>
+        <div class="field">
+          <label>Je suis</label>
+          <div class="role-pick">
+            <input type="radio" id="r-client" name="role" value="client" checked>
+            <label for="r-client">Client<br><small style="color:var(--ink-soft)">Je cherche un bien</small></label>
+            <input type="radio" id="r-agent" name="role" value="agent">
+            <label for="r-agent">Agent Y-Plaza<br><small style="color:var(--ink-soft)">Je gère des biens</small></label>
+          </div>
+        </div>
+        <div class="field" id="code-field" style="display:none">
+          <label>Code agence <small style="text-transform:none;letter-spacing:0">(fourni par la direction)</small></label>
+          <input type="text" name="code_agent" placeholder="Code confidentiel">
+        </div>
+        <button class="btn btn-brass" type="submit">Créer mon compte</button>
+      </div>
+    </form>
+    <p class="auth-foot">Déjà inscrit ? <a href="{{ url_for('login') }}">Se connecter</a></p>
+  </div>
+</main>
+<script>
+// Affiche le champ code uniquement si "Agent" est sélectionné
+const codeField = document.getElementById('code-field');
+document.querySelectorAll('input[name="role"]').forEach(r => {
+  r.addEventListener('change', () => {
+    codeField.style.display = (document.getElementById('r-agent').checked) ? 'flex' : 'none';
+  });
+});
+</script>
+{% endblock %}

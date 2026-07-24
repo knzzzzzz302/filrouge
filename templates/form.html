@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ titre_page }} — Y-Plaza{% endblock %}
+
+{% block styles %}
+.form-wrap{max-width:760px;margin:0 auto;padding:clamp(3rem,6vw,5rem) 1.2rem}
+.form-card{
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:clamp(1.6rem,4vw,2.8rem);
+}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;margin-top:1.8rem}
+.form-grid .full{grid-column:1/-1}
+@media (max-width:640px){.form-grid{grid-template-columns:1fr}}
+.form-foot{display:flex;gap:.8rem;margin-top:2rem;flex-wrap:wrap}
+{% endblock %}
+
+{% block content %}
+<main class="form-wrap reveal">
+  <div class="form-card">
+    <p class="eyebrow">{{ titre_page }}</p>
+    <h1 class="display" style="font-size:clamp(1.8rem,4vw,2.5rem)">
+      {% if bien %}{{ bien.titre }}{% else %}Publier un nouveau bien{% endif %}
+    </h1>
+
+    <form method="POST" enctype="multipart/form-data">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Titre de l'annonce</label>
+          <input type="text" name="titre" required value="{{ bien.titre if bien else '' }}"
+                 placeholder="Bastide provençale rénovée">
+        </div>
+
+        <div class="field">
+          <label>Type de bien</label>
+          <select name="type" required>
+            {% set ct = bien.type if bien else '' %}
+            {% for t in ["Appartement","Maison","Local commercial","Terrain"] %}
+            <option value="{{ t }}" {% if ct == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Ville</label>
+          <input type="text" name="ville" required value="{{ bien.ville if bien else '' }}"
+                 placeholder="Aix-en-Provence">
+        </div>
+
+        <div class="field">
+          <label>Prix (€)</label>
+          <input type="number" step="1000" min="0" name="prix" required
+                 value="{{ '%.0f'|format(bien.prix) if bien else '' }}" placeholder="650000">
+        </div>
+
+        <div class="field">
+          <label>Surface (m²)</label>
+          <input type="number" step="1" min="1" name="surface" required
+                 value="{{ '%.0f'|format(bien.surface) if bien else '' }}" placeholder="120">
+        </div>
+
+        <div class="field">
+          <label>Nombre de pièces</label>
+          <input type="number" step="1" min="0" name="pieces"
+                 value="{{ bien.pieces if bien else '' }}" placeholder="4">
+        </div>
+
+        <div class="field">
+          <label>Statut</label>
+          <select name="statut" required>
+            {% set cs = bien.statut if bien else 'A vendre' %}
+            {% for s in ["A vendre","En négociation","Vendu"] %}
+            <option value="{{ s }}" {% if cs == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field full">
+          <label>Photo — fichier <small style="text-transform:none;letter-spacing:0">(jpg, png, webp — 5 Mo max)</small></label>
+          <input type="file" name="image_fichier" accept=".jpg,.jpeg,.png,.webp">
+        </div>
+        <div class="field full">
+          <label>Ou photo par URL <small style="text-transform:none;letter-spacing:0">(optionnel)</small></label>
+          <input type="url" name="image_url" value="{{ bien.image_url or '' if bien else '' }}"
+                 placeholder="https://images.unsplash.com/…">
+        </div>
+        <div class="field full">
+          <label>Description</label>
+          <textarea name="description" rows="5"
+                    placeholder="Atouts, environnement, prestations…">{{ bien.description if bien else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="form-foot">
+        <button class="btn btn-brass" type="submit">{{ action }}</button>
+        <a class="btn btn-line" href="{{ url_for('biens') }}">Annuler</a>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}
