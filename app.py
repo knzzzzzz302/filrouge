@@ -1,31 +1,42 @@
 # ============================================================
-# Y-PLAZA v3 — Plateforme immobilière complète
-# Flask + SQLite.
+# Y-PLAZA v5 — Plateforme immobilière (Projet Fil Rouge B2)
 #
-# v3 :
-#   - Landing page (/) + catalogue (/biens)
-#   - Photos sur les annonces (banque Unsplash, libre de droits)
-#   - Code agence obligatoire pour créer un compte Agent
-#   - Estimateur vente / budget achat / loyer, basé sur un
-#     barème de prix au m² du marché français (réf. 2026)
+# ARCHITECTURE EN COUCHES :
+#   models.py  → couche métier orientée objet (classes Bien, User,
+#                Estimateur, Database, Repositories)
+#   app.py     → couche présentation : routes Flask uniquement.
+#                Aucune requête SQL n'est écrite ici, tout passe
+#                par les repositories. Séparation des responsabilités.
 # ============================================================
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-import sqlite3
 import os
 import uuid
 
+from models import (
+    Database, Bien, User, Estimateur,
+    BienRepository, UserRepository, FavoriRepository, MessageRepository,
+)
+
 app = Flask(__name__)
 app.secret_key = "yplaza-fil-rouge-b2-secret"
-DB_PATH = os.path.join(os.path.dirname(__file__), "yplaza.db")
 
 # --- Upload d'images : règles de sécurité ---
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-EXTENSIONS_OK = {"jpg", "jpeg", "png", "webp"}          # liste blanche stricte
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024      # 5 Mo max par requête
+EXTENSIONS_OK = {"jpg", "jpeg", "png", "webp"}     # liste blanche stricte
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 Mo max
+
+# Code confidentiel remis aux agents par la direction
+CODE_AGENT = "yplaza2026agent"
+
+# --- Instanciation des objets métier (une seule fois au démarrage) ---
+db = Database(os.path.join(os.path.dirname(__file__), "yplaza.db"))
+biens_repo = BienRepository(db)
+users_repo = UserRepository(db)
+favoris_repo = FavoriRepository(db)
+messages_repo = MessageRepository(db)
 
 
 def fichier_autorise(nom):
@@ -34,24 +45,20 @@ def fichier_autorise(nom):
 
 
 def sauver_image(fichier):
-    """Enregistre l'image avec un nom ALÉATOIRE (uuid) pour empêcher
-    l'écrasement de fichiers et l'exécution de noms malveillants.
-    Retourne le chemin web ou None."""
+    """Enregistre l'image avec un nom ALEATOIRE (uuid) : empêche
+    l'ecrasement de fichiers et neutralise les noms malveillants."""
     if not fichier or fichier.filename == "":
         return None
     if not fichier_autorise(fichier.filename):
         return None
     ext = fichier.filename.rsplit(".", 1)[1].lower()
-    nom = f"{uuid.uuid4().hex}.{ext}"                    # jamais le nom d'origine
+    nom = f"{uuid.uuid4().hex}.{ext}"
     fichier.save(os.path.join(UPLOAD_DIR, nom))
     return f"/static/uploads/{nom}"
 
-# Code confidentiel remis aux agents par la direction
-CODE_AGENT = "yplaza2026agent"
 
 # ------------------------------------------------------------
-# BARÈME MARCHÉ FRANÇAIS (réf. début 2026, ordre de grandeur
-# des prix médians constatés). Utilisé par l'estimateur.
+# BAREMES DE MARCHE (references France, debut 2026)
 # ------------------------------------------------------------
 PRIX_M2 = {
     "Paris": 9400, "Nice": 5300, "Aix-en-Provence": 5100, "Lyon": 4600,
@@ -73,19 +80,12 @@ LOYER_M2 = {
     "Aubagne": 13.0, "Grenoble": 13.0, "Dijon": 11.5, "Reims": 11.0,
     "Le Havre": 10.0, "Saint-Étienne": 8.5, "Perpignan": 10.5,
 }
-COEF_TYPE = {"Appartement": 1.00, "Maison": 1.06, "Local commercial": 0.85, "Terrain": 0.28}
-COEF_ETAT = {"Neuf ou refait": 1.10, "Bon état": 1.00, "Travaux à prévoir": 0.83}
-FRAIS_NOTAIRE_ANCIEN = 0.075  # ~7,5 % dans l'ancien
 
-
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+estimateur = Estimateur(PRIX_M2, LOYER_M2)
 
 
 # ------------------------------------------------------------
-# Biens de démonstration (photos Unsplash, libres de droits)
+# Donnees de demonstration (photos Unsplash, libres de droits)
 # ------------------------------------------------------------
 U = "https://images.unsplash.com/"
 IMG = lambda pid: f"{U}{pid}?auto=format&fit=crop&w=900&q=75"
@@ -143,8 +143,8 @@ BIENS_DEMO = [
 
 
 def init_db():
-    conn = get_db()
-    conn.execute("""
+    """Cree les tables si besoin et insere les donnees de demonstration."""
+    db.execute("""
         CREATE TABLE IF NOT EXISTS biens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             titre TEXT NOT NULL, type TEXT NOT NULL, ville TEXT NOT NULL,
@@ -154,66 +154,62 @@ def init_db():
             image_url TEXT
         )
     """)
-    conn.execute("""
+    db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'client'
         )
     """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            bien_id INTEGER NOT NULL,
-            expediteur_id INTEGER NOT NULL,
-            contenu TEXT NOT NULL,
-            date_envoi TEXT DEFAULT (datetime('now','localtime')),
-            lu INTEGER NOT NULL DEFAULT 0
-        )
-    """)
-    conn.execute("""
+    db.execute("""
         CREATE TABLE IF NOT EXISTS favoris (
             user_id INTEGER NOT NULL, bien_id INTEGER NOT NULL,
             PRIMARY KEY (user_id, bien_id)
         )
     """)
-    if conn.execute("SELECT COUNT(*) c FROM biens").fetchone()["c"] == 0:
-        conn.executemany(
-            "INSERT INTO biens (titre,type,ville,prix,surface,pieces,description,statut,image_url) VALUES (?,?,?,?,?,?,?,?,?)",
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bien_id INTEGER NOT NULL, expediteur_id INTEGER NOT NULL,
+            contenu TEXT NOT NULL,
+            date_envoi TEXT DEFAULT (datetime('now','localtime')),
+            lu INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    if db.query_one("SELECT COUNT(*) c FROM biens")["c"] == 0:
+        db.execute_many(
+            "INSERT INTO biens (titre,type,ville,prix,surface,pieces,description,statut,image_url)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
             BIENS_DEMO,
         )
-    if conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0:
-        conn.execute(
-            "INSERT INTO users (nom,email,password_hash,role) VALUES (?,?,?,?)",
-            ("Agent Y-Plaza", "agent@yplaza.fr", generate_password_hash("Demo2026!"), "agent"),
-        )
-    conn.commit()
-    conn.close()
+    # Compte agent de demonstration : agent@yplaza.fr / Demo2026!
+    if users_repo.compter() == 0:
+        agent = User("Agent Y-Plaza", "agent@yplaza.fr", role=User.ROLE_AGENT)
+        agent.password = "Demo2026!"          # passe par le setter -> hachage
+        users_repo.creer(agent)
 
 
 # ------------------------------------------------------------
-# Auth helpers
+# Authentification
 # ------------------------------------------------------------
 def current_user():
+    """Renvoie l'objet User connecte, ou None."""
     uid = session.get("user_id")
-    if uid is None:
-        return None
-    conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    conn.close()
-    return user
+    return users_repo.par_id(uid) if uid else None
 
 
 @app.context_processor
-def inject_user():
-    return {"user": current_user()}
+def inject_globals():
+    u = current_user()
+    non_lus = messages_repo.non_lus() if (u and u.est_agent()) else 0
+    return {"user": u, "non_lus": non_lus}
 
 
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if session.get("user_id") is None:
-            flash("Connectez-vous pour accéder à cette page.")
+            flash("Connectez-vous pour acceder a cette page.")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
@@ -223,48 +219,36 @@ def agent_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         u = current_user()
-        if u is None or u["role"] != "agent":
-            flash("Accès réservé aux agents Y-Plaza.")
+        if u is None or not u.est_agent():
+            flash("Acces reserve aux agents Y-Plaza.")
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
 
 
-# ------------------------------------------------------------
-# Inscription (avec code agence) / Connexion / Déconnexion
-# ------------------------------------------------------------
 @app.route("/inscription", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        nom = request.form["nom"].strip()
-        email = request.form["email"].strip().lower()
-        password = request.form["password"]
-        role = request.form.get("role", "client")
+        role = request.form.get("role", User.ROLE_CLIENT)
         code = request.form.get("code_agent", "").strip()
 
-        if role == "agent" and code != CODE_AGENT:
-            flash("Code agence invalide. Le compte Agent nécessite le code fourni par la direction.")
+        if role == User.ROLE_AGENT and code != CODE_AGENT:
+            flash("Code agence invalide. Le compte Agent necessite le code fourni par la direction.")
             return render_template("register.html")
-        if role not in ("client", "agent"):
-            role = "client"
-        if len(password) < 8:
-            flash("Le mot de passe doit contenir au moins 8 caractères.")
+        if users_repo.existe(request.form["email"]):
+            flash("Un compte existe deja avec cet email.")
             return render_template("register.html")
 
-        conn = get_db()
-        if conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-            conn.close()
-            flash("Un compte existe déjà avec cet email.")
+        try:
+            nouvel_user = User(request.form["nom"].strip(), request.form["email"], role=role)
+            nouvel_user.password = request.form["password"]   # validation + hachage
+        except ValueError as e:
+            flash(str(e))
             return render_template("register.html")
-        conn.execute(
-            "INSERT INTO users (nom,email,password_hash,role) VALUES (?,?,?,?)",
-            (nom, email, generate_password_hash(password), role),
-        )
-        conn.commit()
-        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-        conn.close()
-        session["user_id"] = user["id"]
-        flash(f"Bienvenue {nom} !")
+
+        user_id = users_repo.creer(nouvel_user)
+        session["user_id"] = user_id
+        flash(f"Bienvenue {nouvel_user.nom} !")
         return redirect(url_for("landing"))
     return render_template("register.html")
 
@@ -272,16 +256,12 @@ def register():
 @app.route("/connexion", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"].strip().lower()
-        password = request.form["password"]
-        conn = get_db()
-        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-        conn.close()
-        if user is None or not check_password_hash(user["password_hash"], password):
+        u = users_repo.par_email(request.form["email"])
+        if u is None or not u.verifier_mot_de_passe(request.form["password"]):
             flash("Email ou mot de passe incorrect.")
             return render_template("login.html")
-        session["user_id"] = user["id"]
-        flash(f"Ravi de vous revoir, {user['nom']} !")
+        session["user_id"] = u.id
+        flash(f"Ravi de vous revoir, {u.nom} !")
         return redirect(url_for("landing"))
     return render_template("login.html")
 
@@ -289,7 +269,7 @@ def login():
 @app.route("/deconnexion")
 def logout():
     session.clear()
-    flash("Vous êtes déconnecté.")
+    flash("Vous etes deconnecte.")
     return redirect(url_for("landing"))
 
 
@@ -298,222 +278,117 @@ def logout():
 # ------------------------------------------------------------
 def user_fav_ids():
     u = current_user()
-    if u is None:
-        return set()
-    conn = get_db()
-    rows = conn.execute("SELECT bien_id FROM favoris WHERE user_id=?", (u["id"],)).fetchall()
-    conn.close()
-    return {r["bien_id"] for r in rows}
+    return favoris_repo.ids_pour(u.id) if u else set()
 
 
 @app.route("/favori/<int:bien_id>", methods=["POST"])
 @login_required
 def toggle_favori(bien_id):
-    u = current_user()
-    conn = get_db()
-    if conn.execute("SELECT 1 FROM favoris WHERE user_id=? AND bien_id=?", (u["id"], bien_id)).fetchone():
-        conn.execute("DELETE FROM favoris WHERE user_id=? AND bien_id=?", (u["id"], bien_id))
-    else:
-        conn.execute("INSERT INTO favoris (user_id,bien_id) VALUES (?,?)", (u["id"], bien_id))
-    conn.commit()
-    conn.close()
+    favoris_repo.basculer(current_user().id, bien_id)
     return redirect(request.referrer or url_for("biens"))
 
 
 @app.route("/mes-favoris")
 @login_required
 def favoris():
-    u = current_user()
-    conn = get_db()
-    biens_list = conn.execute("""
-        SELECT b.* FROM biens b JOIN favoris f ON f.bien_id=b.id
-        WHERE f.user_id=? ORDER BY b.id DESC
-    """, (u["id"],)).fetchall()
-    conn.close()
-    return render_template("favoris.html", biens=biens_list, favs=user_fav_ids())
+    return render_template("favoris.html",
+                           biens=favoris_repo.biens_de(current_user().id),
+                           favs=user_fav_ids())
 
 
 # ------------------------------------------------------------
-# Messagerie : un client écrit sur un bien, les agents lisent
+# Messagerie
 # ------------------------------------------------------------
 @app.route("/message/<int:bien_id>", methods=["POST"])
 @login_required
 def envoyer_message(bien_id):
-    u = current_user()
     contenu = request.form.get("contenu", "").strip()
     if not contenu:
         flash("Le message est vide.")
         return redirect(url_for("detail", bien_id=bien_id))
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO messages (bien_id, expediteur_id, contenu) VALUES (?,?,?)",
-        (bien_id, u["id"], contenu),
-    )
-    conn.commit(); conn.close()
-    flash("Message envoyé à l'agence.")
+    messages_repo.envoyer(bien_id, current_user().id, contenu)
+    flash("Message envoye a l'agence.")
     return redirect(url_for("detail", bien_id=bien_id))
 
 
 @app.route("/messagerie")
 @agent_required
 def messagerie():
-    conn = get_db()
-    msgs = conn.execute("""
-        SELECT m.*, u.nom AS expediteur, u.email, b.titre AS bien_titre, b.id AS bid
-        FROM messages m
-        JOIN users u ON u.id = m.expediteur_id
-        JOIN biens b ON b.id = m.bien_id
-        ORDER BY m.id DESC
-    """).fetchall()
-    # Marque tout comme lu à l'ouverture
-    conn.execute("UPDATE messages SET lu = 1")
-    conn.commit(); conn.close()
+    msgs = messages_repo.tous()
+    messages_repo.marquer_lus()
     return render_template("messagerie.html", msgs=msgs)
 
 
-def nb_messages_non_lus():
-    u = current_user()
-    if u is None or u["role"] != "agent":
-        return 0
-    conn = get_db()
-    n = conn.execute("SELECT COUNT(*) c FROM messages WHERE lu = 0").fetchone()["c"]
-    conn.close()
-    return n
-
-
-@app.context_processor
-def inject_unread():
-    return {"non_lus": nb_messages_non_lus()}
-
-
 # ------------------------------------------------------------
-# Landing page
+# Pages publiques
 # ------------------------------------------------------------
 @app.route("/")
 def landing():
-    conn = get_db()
-    vedettes = conn.execute(
-        "SELECT * FROM biens WHERE statut='A vendre' ORDER BY prix DESC LIMIT 3"
-    ).fetchall()
-    stats = conn.execute("""
-        SELECT COUNT(*) total,
-               SUM(CASE WHEN statut='A vendre' THEN 1 ELSE 0 END) en_vente,
-               AVG(prix/surface) prix_m2
-        FROM biens
-    """).fetchone()
-    conn.close()
-    return render_template("landing.html", vedettes=vedettes, stats=stats, favs=user_fav_ids())
+    return render_template("landing.html",
+                           vedettes=biens_repo.vedettes(),
+                           stats=biens_repo.statistiques(),
+                           favs=user_fav_ids())
 
 
-# ------------------------------------------------------------
-# Catalogue : liste + recherche + filtres
-# ------------------------------------------------------------
 @app.route("/biens")
 def biens():
-    q = request.args.get("q", "").strip()
-    ville = request.args.get("ville", "")
-    type_bien = request.args.get("type", "")
-    statut = request.args.get("statut", "")
-    prix_max = request.args.get("prix_max", "")
-
-    sql = "SELECT * FROM biens WHERE 1=1"
-    params = []
-    if q:
-        sql += " AND (titre LIKE ? OR description LIKE ? OR ville LIKE ?)"
-        like = f"%{q}%"
-        params += [like, like, like]
-    if ville:
-        sql += " AND ville = ?"; params.append(ville)
-    if type_bien:
-        sql += " AND type = ?"; params.append(type_bien)
-    if statut:
-        sql += " AND statut = ?"; params.append(statut)
-    if prix_max:
-        sql += " AND prix <= ?"; params.append(float(prix_max))
-    sql += " ORDER BY id DESC"
-
-    conn = get_db()
-    biens_list = conn.execute(sql, params).fetchall()
-    villes = [r["ville"] for r in conn.execute("SELECT DISTINCT ville FROM biens ORDER BY ville")]
-    stats = conn.execute("""
-        SELECT COUNT(*) total,
-               SUM(CASE WHEN statut='A vendre' THEN 1 ELSE 0 END) en_vente,
-               AVG(prix) prix_moyen, AVG(prix/surface) prix_m2
-        FROM biens
-    """).fetchone()
-    conn.close()
-    return render_template("index.html", biens=biens_list, villes=villes, stats=stats,
+    filtres = {
+        "q": request.args.get("q", "").strip(),
+        "ville": request.args.get("ville", ""),
+        "type": request.args.get("type", ""),
+        "statut": request.args.get("statut", ""),
+        "prix_max": request.args.get("prix_max", ""),
+    }
+    return render_template("index.html",
+                           biens=biens_repo.tous(filtres),
+                           villes=biens_repo.villes(),
+                           stats=biens_repo.statistiques(),
                            favs=user_fav_ids(),
-                           q=q, ville=ville, type_bien=type_bien, statut=statut, prix_max=prix_max)
+                           q=filtres["q"], ville=filtres["ville"],
+                           type_bien=filtres["type"], statut=filtres["statut"],
+                           prix_max=filtres["prix_max"])
 
 
-# ------------------------------------------------------------
-# Estimateur (vente / budget achat / loyer)
-# ------------------------------------------------------------
+@app.route("/bien/<int:bien_id>")
+def detail(bien_id):
+    bien = biens_repo.par_id(bien_id)
+    if bien is None:
+        return redirect(url_for("biens"))
+    return render_template("detail.html", bien=bien,
+                           similaires=biens_repo.similaires(bien),
+                           favs=user_fav_ids())
+
+
 @app.route("/estimation", methods=["GET", "POST"])
 def estimation():
     resultat = None
     if request.method == "POST":
-        ville = request.form["ville"]
-        type_bien = request.form["type"]
-        surface = float(request.form["surface"])
-        etat = request.form["etat"]
-
-        base_m2 = PRIX_M2.get(ville, 3000)          # défaut si ville inconnue
-        loyer_m2 = LOYER_M2.get(ville, 12.0)
-        coef = COEF_TYPE.get(type_bien, 1.0) * COEF_ETAT.get(etat, 1.0)
-
-        valeur = base_m2 * surface * coef
-        loyer = loyer_m2 * surface * COEF_ETAT.get(etat, 1.0)
-        if type_bien == "Terrain":
-            loyer = 0  # un terrain nu ne se loue pas en résidentiel
-
-        resultat = {
-            "ville": ville, "type": type_bien, "surface": surface, "etat": etat,
-            "prix_m2_ref": base_m2,
-            "vente_basse": valeur * 0.93,
-            "vente": valeur,
-            "vente_haute": valeur * 1.07,
-            "notaire": valeur * FRAIS_NOTAIRE_ANCIEN,
-            "budget_achat": valeur * (1 + FRAIS_NOTAIRE_ANCIEN),
-            "loyer": loyer,
-            "rendement": (loyer * 12 / valeur * 100) if valeur and loyer else 0,
-        }
-    return render_template("estimation.html", villes=sorted(PRIX_M2.keys()), resultat=resultat)
+        # On construit un vrai objet metier : la sous-classe est choisie
+        # automatiquement, et son coefficient_marche() s'applique tout seul.
+        bien = Bien.creer(
+            request.form["type"],
+            titre="Estimation", ville=request.form["ville"],
+            prix=1, surface=float(request.form["surface"]),
+        )
+        resultat = estimateur.estimer(bien, request.form["etat"])
+    return render_template("estimation.html", villes=estimateur.villes, resultat=resultat)
 
 
 # ------------------------------------------------------------
-# Détail
+# CRUD - agents uniquement
 # ------------------------------------------------------------
-@app.route("/bien/<int:bien_id>")
-def detail(bien_id):
-    conn = get_db()
-    bien = conn.execute("SELECT * FROM biens WHERE id=?", (bien_id,)).fetchone()
-    if bien is None:
-        conn.close()
-        return redirect(url_for("biens"))
-    similaires = conn.execute(
-        "SELECT * FROM biens WHERE id != ? AND (ville=? OR type=?) ORDER BY RANDOM() LIMIT 3",
-        (bien_id, bien["ville"], bien["type"]),
-    ).fetchall()
-    conn.close()
-    return render_template("detail.html", bien=bien, similaires=similaires, favs=user_fav_ids())
-
-
-# ------------------------------------------------------------
-# CRUD — agents uniquement
-# ------------------------------------------------------------
-def _form_values():
-    # Un fichier uploadé est prioritaire sur l'URL saisie
+def _bien_depuis_formulaire():
+    """Construit un objet Bien (sous-classe adaptee) a partir du formulaire."""
     image = sauver_image(request.files.get("image_fichier"))
     if image is None:
         image = request.form.get("image_url", "").strip() or None
-    return (
-        request.form["titre"], request.form["type"], request.form["ville"],
-        float(request.form["prix"]), float(request.form["surface"]),
-        int(request.form.get("pieces") or 0),
-        request.form["description"], request.form["statut"],
-        image,
+    return Bien.creer(
+        request.form["type"],
+        titre=request.form["titre"], ville=request.form["ville"],
+        prix=request.form["prix"], surface=request.form["surface"],
+        pieces=int(request.form.get("pieces") or 0),
+        description=request.form["description"], statut=request.form["statut"],
+        image_url=image,
     )
 
 
@@ -521,42 +396,35 @@ def _form_values():
 @agent_required
 def ajouter():
     if request.method == "POST":
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO biens (titre,type,ville,prix,surface,pieces,description,statut,image_url) VALUES (?,?,?,?,?,?,?,?,?)",
-            _form_values(),
-        )
-        conn.commit(); conn.close()
-        flash("Bien publié.")
-        return redirect(url_for("biens"))
-    return render_template("form.html", bien=None, action="Publier le bien", titre_page="Nouveau bien")
+        try:
+            biens_repo.ajouter(_bien_depuis_formulaire())
+            flash("Bien publie.")
+            return redirect(url_for("biens"))
+        except ValueError as e:
+            flash(str(e))
+    return render_template("form.html", bien=None,
+                           action="Publier le bien", titre_page="Nouveau bien")
 
 
 @app.route("/modifier/<int:bien_id>", methods=["GET", "POST"])
 @agent_required
 def modifier(bien_id):
-    conn = get_db()
     if request.method == "POST":
-        conn.execute(
-            "UPDATE biens SET titre=?,type=?,ville=?,prix=?,surface=?,pieces=?,description=?,statut=?,image_url=? WHERE id=?",
-            _form_values() + (bien_id,),
-        )
-        conn.commit(); conn.close()
-        flash("Fiche mise à jour.")
-        return redirect(url_for("detail", bien_id=bien_id))
-    bien = conn.execute("SELECT * FROM biens WHERE id=?", (bien_id,)).fetchone()
-    conn.close()
-    return render_template("form.html", bien=bien, action="Enregistrer", titre_page="Modifier le bien")
+        try:
+            biens_repo.modifier(bien_id, _bien_depuis_formulaire())
+            flash("Fiche mise a jour.")
+            return redirect(url_for("detail", bien_id=bien_id))
+        except ValueError as e:
+            flash(str(e))
+    return render_template("form.html", bien=biens_repo.par_id(bien_id),
+                           action="Enregistrer", titre_page="Modifier le bien")
 
 
 @app.route("/supprimer/<int:bien_id>", methods=["POST"])
 @agent_required
 def supprimer(bien_id):
-    conn = get_db()
-    conn.execute("DELETE FROM biens WHERE id=?", (bien_id,))
-    conn.execute("DELETE FROM favoris WHERE bien_id=?", (bien_id,))
-    conn.commit(); conn.close()
-    flash("Bien supprimé.")
+    biens_repo.supprimer(bien_id)
+    flash("Bien supprime.")
     return redirect(url_for("biens"))
 
 
@@ -565,21 +433,11 @@ def supprimer(bien_id):
 # ------------------------------------------------------------
 @app.route("/dashboard")
 def dashboard():
-    conn = get_db()
-    par_ville = conn.execute("""
-        SELECT ville, COUNT(*) nb, AVG(prix) prix_moyen, AVG(prix/surface) prix_m2
-        FROM biens GROUP BY ville ORDER BY prix_m2 DESC
-    """).fetchall()
-    par_type = conn.execute("SELECT type, COUNT(*) nb FROM biens GROUP BY type ORDER BY nb DESC").fetchall()
-    par_statut = conn.execute("SELECT statut, COUNT(*) nb FROM biens GROUP BY statut").fetchall()
-    stats = conn.execute("""
-        SELECT COUNT(*) total, AVG(prix) prix_moyen, MIN(prix) prix_min,
-               MAX(prix) prix_max, AVG(prix/surface) prix_m2
-        FROM biens
-    """).fetchone()
-    conn.close()
-    return render_template("dashboard.html", par_ville=par_ville, par_type=par_type,
-                           par_statut=par_statut, stats=stats)
+    return render_template("dashboard.html",
+                           par_ville=biens_repo.par_ville(),
+                           par_type=biens_repo.par_type(),
+                           par_statut=biens_repo.par_statut(),
+                           stats=biens_repo.statistiques())
 
 
 if __name__ == "__main__":
